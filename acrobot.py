@@ -2,7 +2,7 @@
 
 ##
 #
-# Swing-up control of a pendulum. 
+# Swing-up control of an acrobot. 
 #
 # This solves the problem
 #
@@ -11,9 +11,9 @@
 #   s.t. x[t+1] = f(x[t], u[t])
 #        x[0] = x_init
 #
-# where f(x,u) defines the discrete-time dynamics of the pendulum, 
-# x = [theta, theta_dot] is the pendulum state, u[t] are joint torques at time
-# t, and x_err[t] = x[t] - x_nom is an error w.r.t. some nominal state. 
+# where f(x,u) defines the discrete-time dynamics, x = [q,v] is the state,
+# u[t] are joint torques at time t, and x_err[t] = x[t] - x_nom is an error
+# w.r.t. some nominal state. 
 #
 ##
 
@@ -25,17 +25,17 @@ import time
 num_steps = 40
 dt = 5e-2
 
-x_init = np.array([0.0, 0.0])
-x_nom = np.array([np.pi, 0])
+x_init = np.array([0.0, 0.0, 0.0, 0.0])
+x_nom = np.array([np.pi, 0.0, 0.0, 0.0])
 
-Q = np.diag([0.0, 0.1])
-R = 1.0*np.eye(1)
-Qf = np.diag([100,1])
+Q = np.diag([0.0, 0.0, 0.1, 0.1])
+R = 0.1*np.eye(1)
+Qf = np.diag([100,100,1,1])
 
 # Create a plant model
 plant = MultibodyPlant(dt)
 Parser(plant).AddModelFromFile(
-        FindResourceOrThrow("drake/examples/pendulum/Pendulum.urdf"))
+        FindResourceOrThrow("drake/examples/acrobot/Acrobot.urdf"))
 plant.Finalize()
 
 context = plant.CreateDefaultContext()
@@ -56,8 +56,8 @@ optimizer.AddFinalCost( x_err.T@Qf@x_err )
 
 # Solve the optimization problem
 start_time = time.time()
-solver = IpoptSolver()
-#solver = SnoptSolver()
+#solver = IpoptSolver()
+solver = SnoptSolver()
 res = solver.Solve(optimizer.prog())
 solve_time = time.time() - start_time
 solver_name = res.get_solver_id().name()
@@ -76,7 +76,7 @@ inputs = optimizer.GetInputSamples(res)
 builder = DiagramBuilder()
 plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
 Parser(plant).AddModelFromFile(
-        FindResourceOrThrow("drake/examples/pendulum/Pendulum.urdf"))
+        FindResourceOrThrow("drake/examples/acrobot/Acrobot.urdf"))
 plant.Finalize()
 
 zero_input = builder.AddSystem(ConstantVectorSource(np.zeros(1)))
