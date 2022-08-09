@@ -55,8 +55,8 @@ optimizer.AddRunningCost( x_err.T@Q@x_err + u.T@R@u )
 optimizer.AddFinalCost( x_err.T@Qf@x_err )
 
 # Solve the optimization problem
-solver = IpoptSolver()
-#solver = SnoptSolver()
+solver = SnoptSolver()
+#solver = IpoptSolver()
 
 start_time = time.time()
 res = solver.Solve(optimizer.prog())
