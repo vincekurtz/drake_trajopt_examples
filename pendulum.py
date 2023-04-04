@@ -98,7 +98,7 @@ for i in range(len(timesteps)):
 
     diagram_context.SetTime(t)
     plant.SetPositionsAndVelocities(plant_context, x)
-    diagram.Publish(diagram_context)
+    diagram.ForcedPublish(diagram_context)
 
     time.sleep(dt)
 
