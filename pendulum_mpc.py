@@ -25,14 +25,16 @@ class ModelPredictiveController(LeafSystem):
         LeafSystem.__init__(self)
 
         # Some options for the trajectory optimization problem
-        num_steps = 10
+        resolve_period = 0.1
+        num_steps = 20
         dt = 0.05
+
         x_init = np.array([0.0, 0.0])
         x_nom = np.array([3.14, 0.0])
+
         Q = np.diag([1.0, 0.1])
         R = 1.0*np.eye(1)
         Qf = np.diag([5.0, 0.1])
-        resolve_dt = 0.10
 
         # Construct an internal system model
         plant = MultibodyPlant(dt)
@@ -65,7 +67,7 @@ class ModelPredictiveController(LeafSystem):
                      PiecewisePolynomial(),  # x trajectory
                      PiecewisePolynomial()]  # u trajectory
                     ))
-        self.DeclarePeriodicUnrestrictedUpdateEvent(period_sec=resolve_dt,
+        self.DeclarePeriodicUnrestrictedUpdateEvent(period_sec=resolve_period,
                                                     offset_sec=0.0,
                                                     update=self.SolveTrajOpt)
 
@@ -99,10 +101,8 @@ class ModelPredictiveController(LeafSystem):
         us = self.optimizer.GetInputSamples(res)
 
         start_time = context.get_time()
-        #x_poly = PiecewisePolynomial.CubicWithContinuousSecondDerivatives(ts, xs)
-        #u_poly = PiecewisePolynomial.CubicWithContinuousSecondDerivatives(ts, us)
-        x_poly = PiecewisePolynomial.FirstOrderHold(ts, xs)
-        u_poly = PiecewisePolynomial.FirstOrderHold(ts, us)
+        x_poly = PiecewisePolynomial.CubicWithContinuousSecondDerivatives(ts, xs)
+        u_poly = PiecewisePolynomial.CubicWithContinuousSecondDerivatives(ts, us)
         new_state = [start_time, x_poly, u_poly]
 
         # Update the abstract state with the optimal trajectory
@@ -119,32 +119,29 @@ class ModelPredictiveController(LeafSystem):
         # Get the solution from the last traj opt solve
         [t0, x_opt, u_opt] = context.get_abstract_state(self.abstract_state).get_value()
 
+        # N.B. checking t>0 is a hack to ensure that the abstract state is
+        # valid. A better way would be to solve the optimization once in the
+        # constructor
         if t > 0:
-            # N.B. checking t>0 is a hack to ensure that the abstract state is
-            # valid. A better way would be to solve the optimization once in the
-            # constructor
-
+            # Get the nominal state and input for this timestep from the last
+            # time we solved the optimization
             x_nom = x_opt.value(t-t0)[:,0]
             u_nom = u_opt.value(t-t0)[0]
 
-            K = np.array([[1.0, 0.1]])  # TODO: set as param
+            # Compute the input with a simple PD+ controller
+            K = np.array([[1.0, 0.1]])
             u = u_nom + K@(x_nom - x)
         else:
             u = np.array([0.0])
         
         output.SetFromVector(u)
 
-
 if __name__=="__main__":
-    # Some parameters
-    plant_dt = 1e-3             # timestep for simulating the plant, seconds
-    control_freq = 20           # Controller frequency, Hz
-
     # Set up the system diagram
     builder = DiagramBuilder()
 
     # Pendulum model
-    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, plant_dt)
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, 1e-3)
     Parser(plant).AddModelFromFile(
             FindResourceOrThrow("drake/examples/pendulum/Pendulum.urdf"))
     plant.Finalize()
@@ -169,6 +166,4 @@ if __name__=="__main__":
     simulator.set_target_realtime_rate(1.0)
     simulator.Initialize()
     simulator.AdvanceTo(5.0)
-
-
 
